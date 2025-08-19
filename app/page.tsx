@@ -42,7 +42,7 @@ export default function Home() {
     const newOpenFiles = openFiles.filter((file) => file !== fileName);
     setOpenFiles(newOpenFiles);
     if (activeFile === fileName) {
-      setActiveFile(newOpenFiles[0] || null);
+      setActiveFile(newOpenFiles[0] || "");
     }
   };
 
