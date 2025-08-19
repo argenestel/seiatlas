@@ -1,37 +1,91 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# seiatlas
 
-## Getting Started
+A chat-first smart contract IDE for Sei EVM testnet. Generate, edit, compile, deploy, and interact with contracts in one place.
 
-First, run the development server:
+## Features
+
+- Chat-driven code generation with markdown code blocks and file path hints
+- Multi-file tool: create/rename/delete/open files, tabbed editor (Monaco)
+- Solidity compile API using `solc`
+- Wallet connect via ConnectKit + Wagmi + Viem for Sei testnet
+- Deploy contracts and interact on a right-side Contract Panel (read/write)
+- Persisted state: chat history, sidebar state, files, open tabs, active file, contract address
+- Monochrome dark UI with Roboto/Roboto Mono fonts
+
+## Quick start
+
+1. Install deps
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
+bun install
+```
+
+2. Configure env
+
+- Create `.env` and set your Gemini API key:
+
+```bash
+NEXT_PUBLIC_GEMINI_KEY=your_google_generative_ai_key
+```
+
+3. Run
+
+```bash
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Wallet & chains
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Uses ConnectKit + Wagmi + Viem. Chains: `sei`, `seiTestnet`.
+- Make sure your wallet is on Sei Testnet. The header has a “Switch to Sei Testnet” button.
 
-## Learn More
+## How to use
 
-To learn more about Next.js, take a look at the following resources:
+1. Use the left sidebar Chat tab. Ask for contracts like:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```text
+Create a HelloWorld contract
+path: ./contracts/HelloWorld.sol
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The AI returns a fenced code block. The app writes it to the hinted `path` or to the active file.
 
-## Deploy on Vercel
+2. Edit files in the main editor. Tabs manage open files.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+3. Deploy
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-# seiatlas
+- Click Deploy (top right) once connected.
+- The compiler accepts the active filename.
+- After deployment, we attempt to fetch the receipt and fill the contract address.
+
+4. Interact
+
+- Use the right Contract Panel: enter/edit contract address, pick Read/Write, select a function, fill inputs, then Call/Send Tx.
+
+## API endpoints
+
+- `POST /api/chat` → LangChain + Gemini. System prompt enforces markdown + `path:` hints.
+- `POST /api/compile` → `{ code, filename }` compiles with `solc`, returns `{ abi, bytecode }`.
+
+## Tech stack
+
+- Next.js App Router, React 19, TypeScript
+- Monaco editor
+- LangChain + Google Generative AI (Gemini)
+- ConnectKit, Wagmi, Viem
+- Tailwind v4 (postcss) + custom CSS
+
+## Notes
+
+- Some providers delay receipts; if the contract address doesn’t auto-populate after deploy, paste it manually in the Contract Panel, or refresh.
+- For write function args: numbers are strings to avoid overflow; arrays/tuples as JSON.
+
+## Scripts
+
+```bash
+bun dev    # dev server
+bun build  # production build
+bun start  # start production
+```
