@@ -117,6 +117,7 @@ export default function Home() {
         abi: abi as any,
         bytecode: ("0x" + bytecode) as Hex,
         chain: seiTestnet,
+        args: [],
       });
       setDeploymentTx(txHash);
       // Try to get receipt and contract address
