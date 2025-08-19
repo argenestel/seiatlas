@@ -1,103 +1,189 @@
-import Image from "next/image";
+"use client";
+
+import { useMemo, useState } from "react";
+import { Hex } from "viem";
+import { seiTestnet } from "wagmi/chains";
+import { useAccount, useWalletClient } from "wagmi";
+import CodeEditor from "./components/Editor";
+import Chat from "./components/Chat";
+import Tabs from "./components/Tabs";
+import WalletHeader from "./components/WalletHeader";
+import SidePanel from "./components/SidePanel";
+import ContractPanel from "./components/ContractPanel";
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [openFiles, setOpenFiles] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return ["contract.sol"];
+    try { const raw = window.localStorage.getItem('seiatlas.files.open'); return raw ? JSON.parse(raw) : ["contract.sol"]; } catch { return ["contract.sol"]; }
+  });
+  const [activeFile, setActiveFile] = useState<string>(() => {
+    if (typeof window === 'undefined') return "contract.sol";
+    return window.localStorage.getItem('seiatlas.files.active') || "contract.sol";
+  });
+  const [code, setCode] = useState<string>("");
+  const [isDeploying, setIsDeploying] = useState(false);
+  const [deploymentTx, setDeploymentTx] = useState<string | null>(null);
+  const [lastDeployed, setLastDeployed] = useState<{ address: string | null; abi: any[] | null }>({ address: null, abi: null });
+  const [files, setFiles] = useState<{ path: string; content: string }[]>(() => {
+    if (typeof window === 'undefined') return [{ path: 'contract.sol', content: '' }];
+    try { const raw = window.localStorage.getItem('seiatlas.files'); return raw ? JSON.parse(raw) : [{ path: 'contract.sol', content: '' }]; } catch { return [{ path: 'contract.sol', content: '' }]; }
+  });
+  const { address, isConnected } = useAccount();
+  const { data: walletClient } = useWalletClient();
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+  const openFile = (fileName: string) => {
+    if (!openFiles.includes(fileName)) {
+      setOpenFiles([...openFiles, fileName]);
+    }
+    setActiveFile(fileName);
+  };
+
+  const closeFile = (fileName: string) => {
+    const newOpenFiles = openFiles.filter((file) => file !== fileName);
+    setOpenFiles(newOpenFiles);
+    if (activeFile === fileName) {
+      setActiveFile(newOpenFiles[0] || null);
+    }
+  };
+
+  const handleCodeChange = (newCode: string) => {
+    setCode(newCode);
+    setFiles((prev) => prev.map((f) => (f.path === activeFile ? { ...f, content: newCode } : f)));
+  };
+
+  // Persist file state
+  
+  if (typeof window !== 'undefined') {
+    try { window.localStorage.setItem('seiatlas.files', JSON.stringify(files)); } catch {}
+    try { window.localStorage.setItem('seiatlas.files.open', JSON.stringify(openFiles)); } catch {}
+    try { if (activeFile) window.localStorage.setItem('seiatlas.files.active', activeFile); } catch {}
+  }
+
+  const createFile = (path: string, content = "") => {
+    if (files.find((f) => f.path === path)) return;
+    setFiles((prev) => [...prev, { path, content }]);
+    setOpenFiles((prev) => (prev.includes(path) ? prev : [...prev, path]));
+    setActiveFile(path);
+    setCode(content);
+  };
+
+  const updateFile = (path: string, content: string) => {
+    setFiles((prev) => prev.map((f) => (f.path === path ? { ...f, content } : f)));
+    if (activeFile === path) setCode(content);
+  };
+
+  const renameFile = (oldPath: string, newPath: string) => {
+    setFiles((prev) => prev.map((f) => (f.path === oldPath ? { ...f, path: newPath } : f)));
+    setOpenFiles((prev) => prev.map((p) => (p === oldPath ? newPath : p)));
+    if (activeFile === oldPath) setActiveFile(newPath);
+  };
+
+  const deleteFile = (path: string) => {
+    setFiles((prev) => prev.filter((f) => f.path !== path));
+    setOpenFiles((prev) => prev.filter((p) => p !== path));
+    if (activeFile === path) {
+      const next = openFiles.find((p) => p !== path) || (files[0]?.path ?? "");
+      setActiveFile(next);
+      const file = files.find((f) => f.path === next);
+      setCode(file?.content || "");
+    }
+  };
+
+  const deployContract = async () => {
+    if (!isConnected || !walletClient) { alert("Please connect your wallet first."); return; }
+
+    setIsDeploying(true);
+    setDeploymentTx(null);
+
+    try {
+      const response = await fetch("/api/compile", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ code, filename: activeFile || "contract.sol" }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("Compilation failed:", errorData.errors);
+        alert("Compilation failed. Check the console for details.");
+        setIsDeploying(false);
+        return;
+      }
+
+      const { abi, bytecode } = await response.json();
+      const txHash = await walletClient.deployContract({
+        abi: abi as any,
+        bytecode: ("0x" + bytecode) as Hex,
+        chain: seiTestnet,
+      });
+      setDeploymentTx(txHash);
+      // Try to get receipt and contract address
+      try {
+        const receipt = await (window as any).ethereum.request({ method: 'eth_getTransactionReceipt', params: [txHash] });
+        const contractAddress = receipt?.contractAddress || null;
+        setLastDeployed({ address: contractAddress, abi });
+      } catch {
+        setLastDeployed({ address: null, abi });
+      }
+    } catch (error) {
+      console.error("Deployment failed:", error);
+      alert("Deployment failed. Check the console for details.");
+    } finally {
+      setIsDeploying(false);
+    }
+  };
+
+  return (
+    <main style={{ display: "flex", height: "100vh" }}>
+      <SidePanel
+        files={files}
+        activeFile={activeFile}
+        onCreateFile={createFile}
+        onUpdateFile={updateFile}
+        onRenameFile={renameFile}
+        onDeleteFile={deleteFile}
+        onOpenFile={(path) => {
+          setActiveFile(path);
+          const f = files.find((x) => x.path === path);
+          setCode(f?.content || "");
+          if (!openFiles.includes(path)) setOpenFiles([...openFiles, path]);
+        }}
+        onCodeChange={handleCodeChange}
+      />
+      <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #2a2a2a", padding: 8, background: '#0a0a0a' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ fontWeight: 700, color: '#e5e7eb' }}>seiatlas</div>
+            <Tabs
+              openFiles={openFiles}
+              activeFile={activeFile}
+              onTabClick={(file) => {
+                setActiveFile(file);
+                const f = files.find((x) => x.path === file);
+                setCode(f?.content || "");
+              }}
+              onTabClose={closeFile}
             />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            {isConnected && (
+              <button onClick={deployContract} disabled={isDeploying} style={{ background: '#1f1f1f', color: '#e5e7eb', border: '1px solid #2a2a2a', padding: '10px 20px', cursor: 'pointer', borderRadius: 8 }}>
+                {isDeploying ? "Deploying..." : "Deploy"}
+              </button>
+            )}
+            <WalletHeader />
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+        {deploymentTx && (
+          <div style={{ padding: '10px', background: '#0a0a0a', color: '#e5e7eb', borderBottom: '1px solid #2a2a2a' }}>
+            Deployment submitted. Tx hash: {deploymentTx}
+          </div>
+        )}
+        <CodeEditor activeFile={activeFile} code={code} onCodeChange={handleCodeChange} />
+      </div>
+      <ContractPanel abi={lastDeployed.abi} address={lastDeployed.address} />
+    </main>
   );
 }
