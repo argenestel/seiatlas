@@ -159,7 +159,7 @@ const Chat: React.FC<ChatProps> = ({ activeFile, onCodeChange, onCreateFile, onU
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
                 onInput={autoResize}
-                style={{ width: '100%', resize: 'none', background: '#121212', border: '1px solid #2a2a2a', color: '#e5e7eb', padding: '12px 14px', borderRadius: 10, lineHeight: 1.4, maxHeight: 160, overflowY: 'auto' }}
+                style={{ width: '90%', resize: 'none', background: '#121212', border: '1px solid #2a2a2a', color: '#e5e7eb', padding: '12px 14px', borderRadius: 10, lineHeight: 1.4, maxHeight: 160, overflowY: 'auto' }}
               />
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
