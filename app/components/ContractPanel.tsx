@@ -33,6 +33,20 @@ export default function ContractPanel({ abi, address }: ContractPanelProps) {
   const [result, setResult] = useState<string>("");
   const [txHash, setTxHash] = useState<string>("");
 
+  const safeStringify = (value: any): string => {
+    if (typeof value === 'bigint') return value.toString();
+    try {
+      return JSON.stringify(value, (_, v) => (typeof v === 'bigint' ? v.toString() : v), 2);
+    } catch {
+      try {
+        // Fallback: wrap root value
+        return JSON.stringify({ value }, (_, v) => (typeof v === 'bigint' ? v.toString() : v), 2);
+      } catch {
+        return String(value);
+      }
+    }
+  };
+
   useEffect(() => {
     const initial = address || (typeof window !== 'undefined' ? window.localStorage.getItem('seiatlas.contract.address') || '' : '');
     setContractAddress(initial);
@@ -70,7 +84,7 @@ export default function ContractPanel({ abi, address }: ContractPanelProps) {
         functionName: currentFn.name as any,
         args: buildArgs(),
       });
-      setResult(JSON.stringify(data, null, 2));
+      setResult(safeStringify(data));
     } catch (e: any) {
       setResult(`Error: ${e?.message || e}`);
     }

@@ -154,8 +154,11 @@ export default function Home() {
       />
       <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #2a2a2a", padding: 8, background: '#0a0a0a' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ fontWeight: 700, color: '#e5e7eb' }}>seiatlas</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <img src="https://cdn.prod.website-files.com/65cb43fecf24523357feada3/65cb43fecf24523357feadb3_Sei_Logotype_Red.webp" alt="Sei" style={{ height: 20, width: 'auto' }} />
+              <div style={{ fontWeight: 700, color: '#e5e7eb', letterSpacing: 0.3 }}>seiatlas</div>
+            </div>
             <Tabs
               openFiles={openFiles}
               activeFile={activeFile}
