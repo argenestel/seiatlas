@@ -10,6 +10,7 @@ import Tabs from "./components/Tabs";
 import WalletHeader from "./components/WalletHeader";
 import SidePanel from "./components/SidePanel";
 import ContractPanel from "./components/ContractPanel";
+import DeployModal from "./components/DeployModal";
 
 export default function Home() {
   const [openFiles, setOpenFiles] = useState<string[]>(() => {
@@ -24,6 +25,8 @@ export default function Home() {
   const [isDeploying, setIsDeploying] = useState(false);
   const [deploymentTx, setDeploymentTx] = useState<string | null>(null);
   const [lastDeployed, setLastDeployed] = useState<{ address: string | null; abi: any[] | null }>({ address: null, abi: null });
+  const [pendingDeploy, setPendingDeploy] = useState<{ abi: any[]; bytecode: string } | null>(null);
+  const [showDeployModal, setShowDeployModal] = useState(false);
   const [files, setFiles] = useState<{ path: string; content: string }[]>(() => {
     if (typeof window === 'undefined') return [{ path: 'contract.sol', content: '' }];
     try { const raw = window.localStorage.getItem('seiatlas.files'); return raw ? JSON.parse(raw) : [{ path: 'contract.sol', content: '' }]; } catch { return [{ path: 'contract.sol', content: '' }]; }
@@ -113,6 +116,13 @@ export default function Home() {
       }
 
       const { abi, bytecode } = await response.json();
+      const hasConstructor = Array.isArray(abi) && abi.some((i: any) => i.type === 'constructor' && (i.inputs?.length || 0) > 0);
+      if (hasConstructor) {
+        setPendingDeploy({ abi, bytecode });
+        setShowDeployModal(true);
+        return;
+      }
+      // No args required: deploy directly
       const txHash = await walletClient.deployContract({
         abi: abi as any,
         bytecode: ("0x" + bytecode) as Hex,
@@ -120,7 +130,6 @@ export default function Home() {
         args: [],
       });
       setDeploymentTx(txHash);
-      // Try to get receipt and contract address
       try {
         const receipt = await (window as any).ethereum.request({ method: 'eth_getTransactionReceipt', params: [txHash] });
         const contractAddress = receipt?.contractAddress || null;
@@ -184,6 +193,36 @@ export default function Home() {
         )}
         <CodeEditor activeFile={activeFile} code={code} onCodeChange={handleCodeChange} />
       </div>
+      <DeployModal
+        open={showDeployModal && !!pendingDeploy}
+        abi={pendingDeploy?.abi || []}
+        bytecode={pendingDeploy?.bytecode || ''}
+        onCancel={() => { setShowDeployModal(false); setPendingDeploy(null); }}
+        onConfirm={async (args) => {
+          if (!walletClient || !pendingDeploy) return;
+          try {
+            const txHash = await walletClient.deployContract({
+              abi: pendingDeploy.abi as any,
+              bytecode: ("0x" + pendingDeploy.bytecode) as Hex,
+              chain: seiTestnet,
+              args,
+            });
+            setDeploymentTx(txHash);
+            setShowDeployModal(false);
+            setPendingDeploy(null);
+            try {
+              const receipt = await (window as any).ethereum.request({ method: 'eth_getTransactionReceipt', params: [txHash] });
+              const contractAddress = receipt?.contractAddress || null;
+              setLastDeployed({ address: contractAddress, abi: pendingDeploy.abi });
+            } catch {
+              setLastDeployed({ address: null, abi: pendingDeploy.abi });
+            }
+          } catch (e) {
+            console.error(e);
+            alert('Deployment failed. Check console.');
+          }
+        }}
+      />
       <ContractPanel abi={lastDeployed.abi} address={lastDeployed.address} />
     </main>
   );
