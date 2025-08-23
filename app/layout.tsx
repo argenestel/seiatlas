@@ -4,34 +4,32 @@ import "./globals.css";
 import Providers from "./providers";
 
 const roboto = Roboto({
-  variable: "--font-roboto",
-  subsets: ["latin"],
-  weight: ["300","400","500","700"],
+	variable: "--font-roboto",
+	subsets: ["latin"],
+	weight: ["300", "400", "500", "700"],
 });
 
 const robotoMono = Roboto_Mono({
-  variable: "--font-roboto-mono",
-  subsets: ["latin"],
-  weight: ["300","400","500","700"],
+	variable: "--font-roboto-mono",
+	subsets: ["latin"],
+	weight: ["300", "400", "500", "700"],
 });
 
 export const metadata: Metadata = {
-  title: "seiatlas",
-  description: "seiatlas — Sei smart contract IDE",
+	title: "seiatlas",
+	description: "seiatlas — Sei smart contract IDE",
 };
 
 export default function RootLayout({
-  children,
+	children,
 }: Readonly<{
-  children: React.ReactNode;
+	children: React.ReactNode;
 }>) {
-  return (
-    <html lang="en">
-      <body
-        className={`${roboto.variable} ${robotoMono.variable} antialiased`}
-      >
-        <Providers>{children}</Providers>
-      </body>
-    </html>
-  );
+	return (
+		<html lang="en">
+			<body className={`${roboto.variable} ${robotoMono.variable} antialiased`}>
+				<Providers>{children}</Providers>
+			</body>
+		</html>
+	);
 }
