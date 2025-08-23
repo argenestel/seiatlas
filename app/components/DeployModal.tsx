@@ -81,7 +81,7 @@ export default function DeployModal({ open, abi, bytecode, onCancel, onConfirm }
                         value={values[idx] ?? ''}
                         onChange={(e) => setValue(idx, e.target.value)}
                         placeholder={isComplex ? 'JSON value' : (isAddress ? '0x...' : (isNumber ? 'number / uint256' : 'value'))}
-                        style={{ width: '100%', padding: 10, background: '#0f0f0f', color: '#e5e7eb', border: '1px solid #2a2a2a', borderRadius: 8 }}
+                        style={{ width: '90%', margin: 10, padding: 10, background: '#0f0f0f', color: '#e5e7eb', border: '1px solid #2a2a2a', borderRadius: 8 }}
                       />
                     )}
                   </div>

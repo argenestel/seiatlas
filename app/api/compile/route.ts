@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import solc from "solc";
+import path from "path";
+import fs from "fs";
 
 export async function POST(req: NextRequest) {
   const { code, filename } = await req.json();
@@ -20,9 +22,31 @@ export async function POST(req: NextRequest) {
     },
   };
 
-  const output = JSON.parse(solc.compile(JSON.stringify(input)));
+  const findImports = (importPath: string) => {
+    try {
+      // Support relative imports (inline) and node_modules (OpenZeppelin)
+      if (importPath.startsWith(".")) {
+        return { contents: "" }; // no filesystem for user code yet
+      }
+      const resolved = path.join(process.cwd(), "node_modules", importPath);
+      if (fs.existsSync(resolved)) {
+        const contents = fs.readFileSync(resolved, "utf8");
+        return { contents };
+      }
+      // Try with .sol default
+      if (fs.existsSync(resolved + ".sol")) {
+        const contents = fs.readFileSync(resolved + ".sol", "utf8");
+        return { contents };
+      }
+      return { error: `File not found: ${importPath}` };
+    } catch (e: any) {
+      return { error: String(e?.message || e) };
+    }
+  };
 
-  if (output.errors) {
+  const output = JSON.parse(solc.compile(JSON.stringify(input), { import: findImports }));
+
+  if (output.errors && output.errors.some((e: any) => e.severity === "error")) {
     return NextResponse.json({ errors: output.errors }, { status: 400 });
   }
 
